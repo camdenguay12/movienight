@@ -23,7 +23,12 @@ def norm(s):return ''.join(c for c in s.casefold() if c.isalnum())
 for i,(title,year,slug,rating) in enumerate(entries):
  key=f"{norm(title)}-{year}"
  if key in metadata:
-  if omdb_key and "imdb_rating" not in metadata[key]:
+  if "tmdb_rating" not in metadata[key]:
+   try:
+    tmdb=api("movie/"+str(metadata[key]["tmdb_id"]))
+    metadata[key]["tmdb_rating"]=round(tmdb["vote_average"],1) if tmdb.get("vote_count") else None
+   except Exception as e:print("TMDB score error:",title,str(e))
+  if omdb_key and ("imdb_rating" not in metadata[key] or "metacritic_score" not in metadata[key]):
    try:
     movie=metadata[key]
     ids=api("movie/"+str(movie["tmdb_id"])+"/external_ids")
@@ -35,6 +40,7 @@ for i,(title,year,slug,rating) in enumerate(entries):
     if omdb.get("Response")=="True":
      movie["imdb_rating"]=omdb.get("imdbRating","N/A")
      movie["rt_score"]=next((r["Value"] for r in omdb.get("Ratings",[]) if r["Source"]=="Rotten Tomatoes"),"N/A")
+     movie["metacritic_score"]=omdb.get("Metascore","N/A")
     else:print("OMDb unavailable:",title)
    except Exception as e:print("OMDb error:",title,str(e))
    time.sleep(.3)
@@ -52,6 +58,7 @@ for i,(title,year,slug,rating) in enumerate(entries):
   movie=max(candidates,key=lambda x:x[0])[1]
   details=api("movie/"+str(movie["id"]),{"append_to_response":"credits"})
   metadata[key]={"tmdb_id":movie["id"],"poster":(details.get("poster_path") or "").lstrip("/"),"genre":", ".join(g["name"] for g in details.get("genres",[])[:3]),"runtime":details.get("runtime"),"plot":details.get("overview",""),"cast":[p["name"] for p in details.get("credits",{}).get("cast",[])[:6]],"tmdb_url":"https://www.themoviedb.org/movie/"+str(movie["id"])}
+  metadata[key]["tmdb_rating"]=round(details["vote_average"],1) if details.get("vote_count") else None
   print(i+1,title,"matched")
  except Exception as e:print("Error",title,str(e))
  if i%10==0:output.write_text(json.dumps(metadata,ensure_ascii=False,separators=(",",":")))
