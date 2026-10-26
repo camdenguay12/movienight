@@ -63,5 +63,15 @@ for i,(title,year,slug,rating) in enumerate(entries):
  except Exception as e:print("Error",title,str(e))
  if i%10==0:output.write_text(json.dumps(metadata,ensure_ascii=False,separators=(",",":")))
  time.sleep(.27)
+for title,year in [("Brazil",1985),("It",2017),("Terrifier 2",2022),("No Country for Old Men",2007),("Donnie Darko",2001)]:
+ key=f"{norm(title)}-{year}"
+ if key in metadata and metadata[key].get("poster"):continue
+ try:
+  results=api("search/movie",{"query":title,"year":year}).get("results",[])
+  candidates=[m for m in results if (m.get("release_date") or "")[:4]==str(year)]
+  if candidates:
+   movie=candidates[0]
+   metadata[key]={"tmdb_id":movie["id"],"poster":(movie.get("poster_path") or "").lstrip("/"),"genre":"","runtime":None,"plot":"","cast":[],"tmdb_url":"https://www.themoviedb.org/movie/"+str(movie["id"])}
+ except Exception as e:print("Avatar poster error:",title,str(e))
 output.write_text(json.dumps(metadata,ensure_ascii=False,separators=(",",":")))
 print("Total metadata:",len(metadata))
