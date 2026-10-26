@@ -11,7 +11,7 @@
  * authenticated user accounts for a private or protected deployment.
  */
 const SPREADSHEET_ID='1iAoojtGJXWfdZlKyqEQoYORLLfND6EhSaX-b12gPt_4';
-const MEMBERS=['Camden','Miles','John','Jackson','Kaitlyn','Jess'];
+const MEMBERS=['Camden','Miles','John','Jackson','Kaitlyn','Jess','Dave'];
 
 /* PINs are salted SHA-256 hashes in Script Properties, never in GitHub.
    Admin bootstrap: set Script Property MOVIE_NIGHT_ADMIN_SETUP_KEY to a random secret.
