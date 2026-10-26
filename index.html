@@ -138,6 +138,7 @@ async function submitAuth(event){event.preventDefault();const pin=document.getEl
 function switchMember(){activeMember='';authToken='';sessionStorage.removeItem('movieNightSession');document.getElementById('authGate').hidden=false;chooseProfile('');loadAuthStatus().then(renderProfiles)}
 function requireOwner(member){if(!activeMember||!authToken){alert('Sign in to make changes');return false}if(member!==activeMember&&activeMember!=='Camden'){alert('You can only edit your own lists');return false}return true}
 function addToMyWatchlist(id){if(!requireOwner(activeMember))return;let f=films.find(x=>x.id===id);if(!f)return;if(!watched(f,activeMember)&&!f.watchlist.includes(activeMember))f.watchlist.push(activeMember);saveListChange(f,activeMember);detailDialog.close();render()}
+function changeMyPin(){if(!activeMember)return;const oldPin=prompt('Current four-digit PIN');if(oldPin===null)return;const newPin=prompt('New four-digit PIN');if(!/^[0-9]{4}$/.test(newPin||'')){alert('Use exactly four digits');return}liveWrite({action:'changePin',member:activeMember,oldPin,newPin});alert('PIN change submitted. It will apply once the backend processes it.')}
 function resetMemberPin(){if(activeMember!=='Camden')return;const member=prompt('Reset PIN for which member? (Camden, Miles, John, Jackson, Kaitlyn, Jess)');if(!members.includes(member))return;liveWrite({action:'resetPin',member});alert('Reset requested. The member can choose a new PIN after the backend processes it.')}
 
 let liveReady=false,liveLoading=false,liveLast='';
@@ -226,5 +227,5 @@ async function fillMissingPosters(){
  }finally{posterLookupBusy=false;if(films.some(f=>!metadata[metaKey(f)]?.poster&&!f.poster&&!externalPosters[metaKey(f)]&&!posterAttempts.has(metaKey(f))))setTimeout(schedulePosterLookup,4000)}
 }
 setTimeout(schedulePosterLookup,2500);
-fetch('./data/movie-metadata.json?v=1',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(data=>{metadata=data;render();schedulePosterLookup()}).catch(console.warn);
+fetch('./data/movie-metadata.json?v=1',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(data=>{metadata=data;render();if(!activeMember)renderProfiles();schedulePosterLookup()}).catch(console.warn);
 </script></body></html>
