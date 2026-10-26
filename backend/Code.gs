@@ -47,6 +47,12 @@ function doPost(e){
    const s=sheet_('Member Lists'),rows=rows_('Member Lists');
    for(let i=rows.length-1;i>=0;i--)if(String(rows[i][0])===x.movieId&&String(rows[i][1])===x.member)s.deleteRow(i+2);
    if(status!=='none')s.appendRow([x.movieId,x.member,status,status==='Rated'?rating:'',now]);
+  }else if(x.action==='poster'){
+   const movieId=String(x.movieId||''),url=String(x.posterUrl||'');
+   if(!movieId||movieId.length>120||!/^https:\/\/is[0-9]+-ssl\.mzstatic\.com\/image\/thumb\//.test(url)||url.length>1500)throw Error('Invalid poster');
+   const s=sheet_('Movies'),rows=rows_('Movies'),i=rows.findIndex(r=>String(r[0])===movieId);
+   if(i<0)throw Error('Movie not found');
+   if(!String(rows[i][4]||'').trim())s.getRange(i+2,5).setValue(url);
   }else throw Error('Unknown action');
   return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
  }catch(err){return ContentService.createTextOutput(JSON.stringify({ok:false,error:String(err)})).setMimeType(ContentService.MimeType.JSON)}
