@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Enrich Letterboxd titles with TMDB metadata; requires TMDB_READ_TOKEN GitHub secret."""
-import os,json,base64,zlib,urllib.request,urllib.parse,time,difflib,pathlib
+import os,json,base64,zlib,urllib.request,urllib.parse,urllib.error,time,difflib,pathlib
 root=pathlib.Path(__file__).resolve().parents[1]
 token=os.environ["TMDB_READ_TOKEN"]
+omdb_key=os.environ.get("OMDB_API_KEY","")
 headers={"Authorization":"Bearer "+token,"Accept":"application/json","User-Agent":"MovieNight/1.0"}
 def api(path,params=None):
  url="https://api.themoviedb.org/3/"+path
@@ -21,7 +22,24 @@ metadata=json.loads(output.read_text()) if output.exists() else {}
 def norm(s):return ''.join(c for c in s.casefold() if c.isalnum())
 for i,(title,year,slug,rating) in enumerate(entries):
  key=f"{norm(title)}-{year}"
- if key in metadata:continue
+ if key in metadata:
+  if omdb_key and "imdb_rating" not in metadata[key]:
+   try:
+    movie=metadata[key]
+    ids=api("movie/"+str(movie["tmdb_id"])+"/external_ids")
+    params={"apikey":omdb_key}
+    if ids.get("imdb_id"):params["i"]=ids["imdb_id"]
+    else:params.update({"t":title,"y":year})
+    url="https://www.omdbapi.com/?"+urllib.parse.urlencode(params)
+    with urllib.request.urlopen(url,timeout=25) as response:omdb=json.load(response)
+    if omdb.get("Response")=="True":
+     movie["imdb_rating"]=omdb.get("imdbRating","N/A")
+     movie["rt_score"]=next((r["Value"] for r in omdb.get("Ratings",[]) if r["Source"]=="Rotten Tomatoes"),"N/A")
+    else:print("OMDb unavailable:",title)
+   except Exception as e:print("OMDb error:",title,str(e))
+   time.sleep(.3)
+  if i%10==0:output.write_text(json.dumps(metadata,ensure_ascii=False,separators=(",",":")))
+  continue
  try:
   results=api("search/movie",{"query":title,"year":year,"include_adult":"false"}).get("results",[])
   if not results:results=api("search/movie",{"query":title,"include_adult":"false"}).get("results",[])
