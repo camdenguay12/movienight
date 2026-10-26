@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""Refresh shared Movie Night metadata from TMDB + OMDb using GitHub Actions secrets."""
+import json, os, re, time, urllib.parse, urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+METADATA = ROOT / "data/movie-metadata.json"
+LIVE = "https://script.google.com/macros/s/AKfycbxWucn9COjS9r1B24bkX-rpmLVU5dXCOtqhbuGCrHQ3Zt1So9IcjQwtoo9pMDSJIktj/exec"
+TMDB_KEY = os.getenv("TMDB_API_KEY") or os.getenv("TMDB_KEY") or ""
+TMDB_TOKEN = os.getenv("TMDB_READ_ACCESS_TOKEN") or os.getenv("TMDB_ACCESS_TOKEN") or ""
+OMDB_KEY = os.getenv("OMDB_API_KEY") or os.getenv("OMDB_KEY") or ""
+
+def get(url, headers=None):
+    request = urllib.request.Request(url, headers={"User-Agent":"MovieNightMetadata/1.0", **(headers or {})})
+    with urllib.request.urlopen(request, timeout=25) as response:
+        return json.load(response)
+
+def key(title, year):
+    return re.sub(r"[^\w]", "", title.lower(), flags=re.UNICODE).replace("_", "") + "-" + str(year)
+
+def same(a,b):
+    return re.sub(r"[^\w]","",str(a).casefold(),flags=re.UNICODE) == re.sub(r"[^\w]","",str(b).casefold(),flags=re.UNICODE)
+
+def tmdb(path, params=None):
+    params = dict(params or {})
+    headers = {}
+    if TMDB_TOKEN:
+        headers["Authorization"] = "Bearer " + TMDB_TOKEN
+    elif TMDB_KEY:
+        params["api_key"] = TMDB_KEY
+    else:
+        raise RuntimeError("Missing TMDB_API_KEY or TMDB_READ_ACCESS_TOKEN secret")
+    return get("https://api.themoviedb.org/3/" + path + "?" + urllib.parse.urlencode(params), headers)
+
+def enrich(movie):
+    title, year = str(movie["title"]).strip(), int(movie["year"])
+    results = tmdb("search/movie", {"query":title,"year":year,"include_adult":"false"}).get("results",[])
+    hits = [m for m in results if str(m.get("release_date",""))[:4] == str(year) and (same(m.get("title",""),title) or same(m.get("original_title",""),title))]
+    if not hits:
+        print("No exact TMDB match:",title,year)
+        return None
+    match = max(hits,key=lambda m:m.get("popularity",0))
+    details = tmdb("movie/"+str(match["id"]),{"append_to_response":"credits"})
+    cast = [person.get("name") for person in details.get("credits",{}).get("cast",[])[:6] if person.get("name")]
+    info = {
+        "tmdb_id":match["id"], "poster":details.get("poster_path","").lstrip("/"),
+        "genre":", ".join(g["name"] for g in details.get("genres",[])),
+        "runtime":details.get("runtime"), "plot":details.get("overview",""),
+        "cast":cast,"tmdb_url":"https://www.themoviedb.org/movie/"+str(match["id"]),
+        "tmdb_rating":round(float(details.get("vote_average") or 0),1)
+    }
+    if OMDB_KEY:
+        params = {"apikey":OMDB_KEY,"t":title,"y":year,"type":"movie"}
+        if details.get("imdb_id"):
+            params = {"apikey":OMDB_KEY,"i":details["imdb_id"]}
+        omdb = get("https://www.omdbapi.com/?" + urllib.parse.urlencode(params))
+        if omdb.get("Response") == "True" and (not omdb.get("Year") or str(omdb["Year"])[:4]==str(year)):
+            if omdb.get("imdbRating") not in (None,"N/A"): info["imdb_rating"] = omdb["imdbRating"]
+            if omdb.get("Metascore") not in (None,"N/A"): info["metacritic_score"] = omdb["Metascore"]
+            for rating in omdb.get("Ratings",[]):
+                if rating.get("Source")=="Rotten Tomatoes":info["rt_score"]=rating["Value"]
+    return info
+
+def main():
+    if not (TMDB_KEY or TMDB_TOKEN):
+        raise SystemExit("Set TMDB_API_KEY or TMDB_READ_ACCESS_TOKEN in GitHub Secrets")
+    state = get(LIVE)
+    films = state.get("films",[])
+    existing = json.loads(METADATA.read_text(encoding="utf-8"))
+    changed = 0
+    for movie in films:
+        title,year = movie.get("title"),movie.get("year")
+        if not title or not str(year).isdigit(): continue
+        k = key(title,year)
+        current = existing.get(k,{})
+        # Existing curated metadata stays intact; missing public ratings or posters are refreshed.
+        if current.get("poster") and current.get("imdb_rating") and current.get("rt_score") and current.get("metacritic_score"):
+            continue
+        try:
+            found = enrich(movie)
+            if found:
+                merged = {**found,**{field:value for field,value in current.items() if value not in ("",None,[])}}
+                if merged != current:
+                    existing[k] = merged
+                    changed += 1
+                    print("Updated:",title,year)
+        except Exception as exc:
+            print("Lookup failed:",title,year,str(exc))
+        time.sleep(0.2)
+    if changed:
+        METADATA.write_text(json.dumps(existing,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
+    print("Updated",changed,"movies out of",len(films))
+
+if __name__=="__main__":
+    main()
