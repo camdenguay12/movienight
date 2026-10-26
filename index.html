@@ -84,18 +84,18 @@ function schedulePosterLookup(){if(posterLookupTimer)return;posterLookupTimer=se
 async function fillMissingPosters(){
  if(posterLookupBusy)return;posterLookupBusy=true;
  try{
-  const missing=films.filter(f=>!metadata[metaKey(f)]?.poster&&!f.poster&&!externalPosters[metaKey(f)]&&!posterAttempts.has(metaKey(f))).slice(0,30);
+  const missing=films.filter(f=>!metadata[metaKey(f)]?.poster&&!f.poster&&!externalPosters[metaKey(f)]&&!posterAttempts.has(metaKey(f))).sort((a,b)=>Number(b.year)-Number(a.year)).slice(0,30);
   for(const f of missing){
    const key=metaKey(f);posterAttempts.add(key);
    try{
-    const res=await fetch('https://itunes.apple.com/search?term='+encodeURIComponent(f.title)+'&entity=movie&limit=30');
+    const res=await fetch('https://itunes.apple.com/search?term='+encodeURIComponent(f.title.toLowerCase()==='hokem'?'Hokum':f.title)+'&entity=movie&limit=30');
     if(!res.ok)throw Error('Movie lookup '+res.status);
     const json=await res.json();
-    const match=json.results?.find(x=>x.trackName?.toLowerCase()===f.title.toLowerCase()&&Math.abs(new Date(x.releaseDate).getUTCFullYear()-Number(f.year))<=1);
+    const match=json.results?.find(x=>x.trackName?.toLowerCase()===(f.title.toLowerCase()==='hokem'?'hokum':f.title.toLowerCase())&&Math.abs(new Date(x.releaseDate).getUTCFullYear()-Number(f.year))<=1);
     if(match?.artworkUrl100){const url=match.artworkUrl100.replace(/100x100bb/g,'600x900bb');externalPosters[key]=url;f.poster=url;save();render();if(liveReady)liveWrite({action:'poster',movieId:f.id,posterUrl:url})}
    }catch(e){posterAttempts.delete(key);console.warn('Poster search failed for',f.title,e)}
   }
- }finally{posterLookupBusy=false}
+ }finally{posterLookupBusy=false;if(films.some(f=>!metadata[metaKey(f)]?.poster&&!f.poster&&!externalPosters[metaKey(f)]&&!posterAttempts.has(metaKey(f))))setTimeout(schedulePosterLookup,4000)}
 }
 setTimeout(schedulePosterLookup,2500);
 fetch('./data/movie-metadata.json?v=1',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(data=>{metadata=data;render();schedulePosterLookup()}).catch(console.warn);
