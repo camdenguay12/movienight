@@ -12,6 +12,44 @@
  */
 const SPREADSHEET_ID='1iAoojtGJXWfdZlKyqEQoYORLLfND6EhSaX-b12gPt_4';
 const MEMBERS=['Camden','Miles','John','Jackson','Kaitlyn','Jess'];
+
+/* PINs are salted SHA-256 hashes in Script Properties, never in GitHub.
+   Admin bootstrap: set Script Property MOVIE_NIGHT_ADMIN_SETUP_KEY to a random secret.
+   First enrollment for other members is open until claimed; admin can reset PINs. */
+function digest_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,value).map(b=>('0'+(b&255).toString(16)).slice(-2)).join('')}
+function prop_(){return PropertiesService.getScriptProperties()}
+function pinKey_(m){return 'PIN_'+m.toUpperCase()}
+function pinSet_(m){return !!prop_().getProperty(pinKey_(m))}
+function checkPin_(m,pin){const record=prop_().getProperty(pinKey_(m));if(!record||!/^[0-9]{4}$/.test(String(pin)))return false;const parts=record.split(':');return digest_(parts[0]+':'+pin)===parts[1]}
+function savePin_(m,pin){if(!MEMBERS.includes(m)||!/^[0-9]{4}$/.test(String(pin)))throw Error('PIN must be exactly four digits');const salt=Utilities.getUuid();prop_().setProperty(pinKey_(m),salt+':'+digest_(salt+':'+pin))}
+function session_(token){if(!/^[a-f0-9]{64}$/.test(String(token||'')))return '';return CacheService.getScriptCache().get('session_'+token)||''}
+function issue_(member){const token=digest_(Utilities.getUuid()+Utilities.getUuid()+Date.now());CacheService.getScriptCache().put('session_'+token,member,21600);return token}
+function auth_(x){
+ const member=String(x.member||''),pin=String(x.pin||'');
+ if(!MEMBERS.includes(member)||!/^[0-9]{4}$/.test(pin))throw Error('Choose a member and enter a four-digit PIN');
+ const cache=CacheService.getScriptCache(),failKey='fails_'+member;
+ if(Number(cache.get(failKey)||0)>=8)throw Error('Too many attempts. Try again in 15 minutes');
+ if(x.action==='register'){
+  if(pinSet_(member))throw Error('This profile already has a PIN');
+  if(member==='Camden' && (!prop_().getProperty('MOVIE_NIGHT_ADMIN_SETUP_KEY')||String(x.setupKey||'')!==prop_().getProperty('MOVIE_NIGHT_ADMIN_SETUP_KEY')))throw Error('Administrator setup key required');
+  savePin_(member,pin);
+ }else if(!checkPin_(member,pin)){
+  cache.put(failKey,String(Number(cache.get(failKey)||0)+1),900);
+  throw Error('Incorrect PIN');
+ }
+ cache.remove(failKey);
+ return {ok:true,member,token:issue_(member)};
+}
+function authStatus_(){return Object.fromEntries(MEMBERS.map(m=>[m,pinSet_(m)]))}
+function authResult_(x){
+ const id=String(x.requestId||'');
+ if(!/^[a-zA-Z0-9_-]{16,100}$/.test(id))throw Error('Invalid request ID');
+ const cache=CacheService.getScriptCache();
+ const result=cache.get('auth_'+id);
+ if(!result)return {ok:false,pending:true};
+ cache.remove('auth_'+id);return JSON.parse(result);
+}
+
 function sheet_(name){return SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(name)}
 function rows_(name){const s=sheet_(name);return s.getLastRow()<2?[]:s.getRange(2,1,s.getLastRow()-1,s.getLastColumn()).getValues()}
 function state_(){
@@ -22,7 +60,7 @@ function state_(){
  return {films:movies,quotes,updatedAt:new Date().toISOString()};
 }
 function doGet(e){
- const data=JSON.stringify(state_());
+ const x=e?.parameter||{};const data=JSON.stringify(x.authResult?authResult_(x):x.authStatus?{ok:true,registered:authStatus_()}:state_());
  const callback=String(e?.parameter?.callback||'');
  if(callback&&/^[a-zA-Z_$][\w$]*$/.test(callback))return ContentService.createTextOutput(callback+'('+data+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
  return ContentService.createTextOutput(data).setMimeType(ContentService.MimeType.JSON);
@@ -31,6 +69,23 @@ function doPost(e){
  const lock=LockService.getScriptLock();lock.waitLock(15000);
  try{
   const x=JSON.parse(e.postData.contents||'{}'),now=new Date().toISOString();
+  if(x.action==='login'||x.action==='register'){
+   let result;try{result=auth_(x)}catch(err){result={ok:false,error:String(err.message||err)}}
+   if(!/^[a-zA-Z0-9_-]{16,100}$/.test(String(x.requestId||'')))throw Error('Invalid request ID');
+   CacheService.getScriptCache().put('auth_'+x.requestId,JSON.stringify(result),120);
+   return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
+  }
+  const actor=session_(x.token);
+  if(!actor)throw Error('Sign in required');
+  if(x.member&&x.member!==actor&&actor!=='Camden')throw Error('Cannot edit another member');
+  if(x.action==='resetPin'){
+   if(actor!=='Camden'||!MEMBERS.includes(x.member))throw Error('Administrator only');
+   prop_().deleteProperty(pinKey_(x.member));
+  }else if(x.action==='changePin'){
+   if(!MEMBERS.includes(x.member)||x.member!==actor&&actor!=='Camden')throw Error('Not permitted');
+   if(actor!=='Camden'&&!checkPin_(actor,x.oldPin))throw Error('Current PIN incorrect');
+   savePin_(x.member,String(x.newPin||''));
+  }else
   if(x.action==='quote'){
    if(!MEMBERS.includes(x.member)||typeof x.quote!=='string'||x.quote.length>180)throw Error('Invalid quote');
    const s=sheet_('Member Quotes'),rows=rows_('Member Quotes'),i=rows.findIndex(r=>r[0]===x.member),row=[x.member,x.quote,now];
@@ -49,6 +104,7 @@ function doPost(e){
    if(status!=='none')s.appendRow([x.movieId,x.member,status,status==='Rated'?rating:'',now]);
   }else if(x.action==='poster'){
    const movieId=String(x.movieId||''),url=String(x.posterUrl||'');
+   if(actor!=='Camden')throw Error('Poster updates require administrator');
    if(!movieId||movieId.length>120||!/^https:\/\/is[0-9]+-ssl\.mzstatic\.com\/image\/thumb\//.test(url)||url.length>1500)throw Error('Invalid poster');
    const s=sheet_('Movies'),rows=rows_('Movies'),i=rows.findIndex(r=>String(r[0])===movieId);
    if(i<0)throw Error('Movie not found');
