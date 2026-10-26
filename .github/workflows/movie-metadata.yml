@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - 'data/camden.b64'
+      - 'scripts/enrich_movies.py'
+      - '.github/workflows/movie-metadata.yml'
 permissions:
   contents: write
 jobs:
