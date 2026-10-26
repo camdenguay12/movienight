@@ -40,5 +40,7 @@ async function loadCamden(){
  }catch(e){console.error('Could not load Camden Letterboxd data',e);let el=document.getElementById('importStatus');if(!el){el=document.createElement('div');el.id='importStatus';document.querySelector('.wrap').prepend(el)}el.style.cssText='padding:14px;background:#532626;color:#fff;border-radius:8px;margin-bottom:12px';el.textContent='Camden import failed: '+e.message+' — please send this error to me.'}
 }
 loadCamden();
+async function loadFeaturedPosters(){for(const [title,year,key] of [['Hokum',2026,'Hokum'],['Hoppers',2026,'Jess']]){try{const response=await fetch('https://itunes.apple.com/search?term='+encodeURIComponent(title)+'&entity=movie&limit=25');const data=await response.json();const hit=data.results?.find(x=>x.trackName?.toLowerCase()===title.toLowerCase()&&new Date(x.releaseDate).getUTCFullYear()===year);if(!hit?.artworkUrl100)continue;externalPosters[key]=hit.artworkUrl100.replace(/100x100bb/g,'600x900bb');if(key==='Hokum')document.documentElement.style.setProperty('--hokum-poster','url("'+externalPosters[key]+'")');else render()}catch(e){console.warn('Featured poster lookup unavailable',e)}}}
+loadFeaturedPosters();
 fetch('./data/movie-metadata.json?v=1',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(data=>{metadata=data;render()}).catch(console.warn);
 </script></body></html>
