@@ -38,6 +38,33 @@ select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid 
  .homehero p{font-size:clamp(9px,2.65vw,15px);letter-spacing:-.025em;white-space:nowrap}
  .publicbadges{gap:3px}.pubscore{font-size:10px;padding:3px 5px}
 }
+
+/* Distinct jewel-toned surfaces against the charcoal canvas */
+:root{--bg:#14191f;--panel:#203344;--line:#526b80;--muted:#b4c1ca}
+body{background:var(--bg)}
+.stat,.panel,.seenfilter{background:linear-gradient(135deg,#294356 0%,#1e3141 75%);border:1px solid #668197;box-shadow:0 9px 28px #0005, inset 0 1px #ffffff12}
+.stat{border-top:3px solid #d8b36d}
+.stat:nth-child(2){background:linear-gradient(135deg,#244b4c,#1c363e);border-color:#4d8581;border-top-color:#8cc7b4}
+.stat:nth-child(3){background:linear-gradient(135deg,#40334f,#272c41);border-color:#82709a;border-top-color:#c2a0dc}
+.poster{background:linear-gradient(160deg,#2b4051,#1d2d3b);border:1px solid #647e94;box-shadow:0 7px 20px #0005;transition:transform .16s,border-color .16s,box-shadow .16s}
+.poster:hover{transform:translateY(-2px);border-color:#e5bd7a;box-shadow:0 10px 25px #0007}
+.ratedlist,.findlist{background:#223747;border:1px solid #678297;box-shadow:0 10px 26px #0005}
+.ratedrow,.findlist .findrow{background:linear-gradient(90deg,#263e50,#203445);border-bottom-color:#496478}
+.ratedrow:nth-child(even),.findlist .findrow:nth-child(even){background:linear-gradient(90deg,#2c4656,#24394b)}
+.ratedrow:hover,.findlist .findrow:hover{background:linear-gradient(90deg,#38536a,#2b465a)}
+.findcards .findrow{background:linear-gradient(145deg,#294556,#203442);border:1px solid #6b889b;box-shadow:0 7px 20px #0004}
+.findcards .findrow:hover{border-color:#d8b878}
+.filterbar select,.userpicker select,select,input,.search{background:#2d4355;color:#fff9ed;border:1px solid #829caf;box-shadow:0 2px 9px #0003,inset 0 1px #ffffff16}
+.filterbar select:hover,.userpicker select:hover,select:hover,input:hover,.search:hover{border-color:#d4b780;background:#344e62}
+.filterbar select:focus,.userpicker select:focus,select:focus,input:focus,.search:focus{border-color:#f3cd87;outline:2px solid #d3a95777;outline-offset:1px}
+.chip,.viewtoggle button,.secondary,.detailbutton{background:#304c5c;border:1px solid #7795a5;color:#f1f4f6}
+.chip:hover,.viewtoggle button:hover,.secondary:hover,.detailbutton:hover{background:#3c6070;border-color:#e4c287}
+.chip.on,.viewtoggle button.active,.subnav button.active{background:#645039;border-color:#e6be79;color:#ffebc2}
+.subnav{border-bottom:1px solid #536a7c;padding-bottom:8px}
+.subnav button{background:#243747;border:1px solid #4e687d}
+.subnav button.active{background:#645039;border-color:#e6be79}
+.seenfilter{background:linear-gradient(135deg,#25424c,#1f3240)}
+@media(prefers-reduced-motion:reduce){.poster{transition:none}.poster:hover{transform:none}}
 </style></head><body><header class="top"><div class="brand"><img src="assets/ram-popcorn-logo.png.png" alt="Ram with sunglasses and popcorn" onerror="this.style.display='none'"><span>MOVIE NIGHT</span></div><nav class="nav" id="nav"></nav></header><main class="wrap" id="app"></main>
 <dialog id="detailDialog"><div class="dialogtop"><h2 id="detailTitle"></h2><button class="close" onclick="detailDialog.close()">×</button></div><div id="detailBody"></div></dialog>
 <dialog id="addDialog"><div class="dialogtop"><h2>Add a movie</h2><button class="close" onclick="addDialog.close()">×</button></div><form id="movieForm"><div class="formgrid"><label>Movie title<input name="title" required placeholder="e.g. The Grand Budapest Hotel"></label><label>Release year<input name="year" type="number" min="1880" max="2100" placeholder="2014"></label><label>Member<select name="member" id="formMember"></select></label><label>List<select name="status" id="formStatus" onchange="toggleAddRating()"><option value="watchlist">Watchlist</option><option value="watched">Rated</option></select></label><label id="addRatingField" style="display:none">My rating (0–10; optional)<input name="rating" type="number" min="0" max="10" step=".1" placeholder="8.5"></label></div><p class="muted">New titles are saved in this browser for now. Shared accounts and automatic movie matching will be added when we connect a database.</p><button class="primary">Save movie</button></form></dialog>
