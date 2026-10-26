@@ -1,0 +1,36 @@
+name: Sync movie details and ratings
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: movie-metadata-sync
+  cancel-in-progress: false
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Enrich movies with TMDB and OMDb
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TMDB_KEY: ${{ secrets.TMDB_KEY }}
+          TMDB_READ_ACCESS_TOKEN: ${{ secrets.TMDB_READ_ACCESS_TOKEN }}
+          TMDB_ACCESS_TOKEN: ${{ secrets.TMDB_ACCESS_TOKEN }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+          OMDB_KEY: ${{ secrets.OMDB_KEY }}
+        run: python scripts/sync_movie_metadata.py
+      - name: Commit refreshed movie metadata
+        run: |
+          if ! git diff --quiet -- data/movie-metadata.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/movie-metadata.json
+            git commit -m "Automatically enrich new movies from TMDB and OMDb"
+            git push
+          fi
