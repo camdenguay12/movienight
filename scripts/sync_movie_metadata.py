@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Refresh shared Movie Night metadata from TMDB + OMDb using GitHub Actions secrets."""
-import json, os, re, time, urllib.parse, urllib.request
+import json, os, re, time, unicodedata, urllib.parse, urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,8 +18,21 @@ def get(url, headers=None):
 def key(title, year):
     return re.sub(r"[^\w]", "", title.lower(), flags=re.UNICODE).replace("_", "") + "-" + str(year)
 
+def normalized(title):
+    title = unicodedata.normalize("NFKD", str(title).casefold())
+    return re.sub(r"[^a-z0-9]", "", "".join(c for c in title if not unicodedata.combining(c)))
+
+ALIASES = {
+    "cache": {"hidden"}, "hidden": {"cache"},
+    "seven": {"se7en"}, "se7en": {"seven"},
+    "shawshankredemption": {"theshawshankredemption"},
+    "theshawshankredemption": {"shawshankredemption"},
+    "eternalsunshineofaspotlessmind": {"eternalsunshineofthespotlessmind"},
+    "eternalsunshineofthespotlessmind": {"eternalsunshineofaspotlessmind"}
+}
 def same(a,b):
-    return re.sub(r"[^\w]","",str(a).casefold(),flags=re.UNICODE) == re.sub(r"[^\w]","",str(b).casefold(),flags=re.UNICODE)
+    x,y = normalized(a),normalized(b)
+    return x==y or y in ALIASES.get(x,set()) or x in ALIASES.get(y,set())
 
 def tmdb(path, params=None):
     params = dict(params or {})
@@ -34,12 +47,12 @@ def tmdb(path, params=None):
 
 def enrich(movie):
     title, year = str(movie["title"]).strip(), int(movie["year"])
-    results = tmdb("search/movie", {"query":title,"year":year,"include_adult":"false"}).get("results",[])
-    hits = [m for m in results if str(m.get("release_date",""))[:4] == str(year) and (same(m.get("title",""),title) or same(m.get("original_title",""),title))]
+    results = tmdb("search/movie", {"query":title,"include_adult":"false"}).get("results",[])
+    hits = [m for m in results if str(m.get("release_date",""))[:4].isdigit() and abs(int(str(m["release_date"])[:4])-year)<=1 and (same(m.get("title",""),title) or same(m.get("original_title",""),title))]
     if not hits:
         print("No exact TMDB match:",title,year)
         return None
-    match = max(hits,key=lambda m:m.get("popularity",0))
+    match = max(hits,key=lambda m:(int(str(m.get("release_date",""))[:4])==year,m.get("popularity",0)))
     details = tmdb("movie/"+str(match["id"]),{"append_to_response":"credits"})
     cast = [person.get("name") for person in details.get("credits",{}).get("cast",[])[:6] if person.get("name")]
     info = {
