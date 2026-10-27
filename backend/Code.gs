@@ -57,7 +57,7 @@ function state_(){
  const byId=new Map(movies.map(f=>[f.id,f]));
  rows_('Member Lists').forEach(r=>{const f=byId.get(String(r[0])),m=String(r[1]);if(!f||!MEMBERS.includes(m))return;if(r[2]==='Rated'&&r[3]!==''&&r[3]!==null)f.ratings[m]=Number(r[3]);else if(r[2]==='Watchlist'&&!f.watchlist.includes(m))f.watchlist.push(m)});
  const quotes={};rows_('Member Quotes').forEach(r=>{if(MEMBERS.includes(String(r[0])))quotes[String(r[0])]=String(r[1]||'')});
- return {films:movies,quotes,updatedAt:new Date().toISOString()};
+ const signatures={};const sigSheet=sheet_('Member Signatures');if(sigSheet&&sigSheet.getLastRow()>1)sigSheet.getRange(2,1,sigSheet.getLastRow()-1,2).getValues().forEach(r=>{if(MEMBERS.includes(String(r[0])))signatures[String(r[0])]=String(r[1]||'')});return {films:movies,quotes,signatures,updatedAt:new Date().toISOString()};
 }
 function doGet(e){
  const x=e?.parameter||{};const data=JSON.stringify(x.authResult?authResult_(x):x.authStatus?{ok:true,registered:authStatus_()}:state_());
@@ -86,7 +86,7 @@ function doPost(e){
    if(actor!=='Camden'&&!checkPin_(actor,x.oldPin))throw Error('Current PIN incorrect');
    savePin_(x.member,String(x.newPin||''));
   }else
-  if(x.action==='quote'){
+  if(x.action==='signature'){if(!MEMBERS.includes(x.member)||!x.movieId)throw Error('Invalid signature movie');const movieIds=rows_('Movies').map(r=>String(r[0]));if(!movieIds.includes(String(x.movieId)))throw Error('Movie not found');const lists=rows_('Member Lists');if(!lists.some(r=>String(r[0])===String(x.movieId)&&String(r[1])===x.member&&['Rated','Watchlist'].includes(String(r[2]))))throw Error('Choose a movie from your own list');const book=SpreadsheetApp.openById(SPREADSHEET_ID);const sh=sheet_('Member Signatures')||book.insertSheet('Member Signatures');if(sh.getLastRow()===0)sh.appendRow(['Member','Movie ID','Updated']);const rows=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,3).getValues():[];const i=rows.findIndex(r=>String(r[0])===x.member),row=[x.member,String(x.movieId),now];if(i<0)sh.appendRow(row);else sh.getRange(i+2,1,1,3).setValues([row]);}else if(x.action==='quote'){
    if(!MEMBERS.includes(x.member)||typeof x.quote!=='string'||x.quote.length>180)throw Error('Invalid quote');
    const s=sheet_('Member Quotes'),rows=rows_('Member Quotes'),i=rows.findIndex(r=>r[0]===x.member),row=[x.member,x.quote,now];
    if(i<0)s.appendRow(row);else s.getRange(i+2,1,1,3).setValues([row]);
