@@ -16,7 +16,7 @@ def get(url, headers=None):
         return json.load(response)
 
 def key(title, year):
-    return re.sub(r"[^\w]", "", title.lower(), flags=re.UNICODE).replace("_", "") + "-" + str(year)
+    return normalized(title) + "-" + str(year)
 
 def normalized(title):
     title = unicodedata.normalize("NFKD", str(title).casefold())
@@ -106,12 +106,12 @@ def main():
         k = key(title,year)
         current = existing.get(k,{})
         # Existing curated metadata stays intact; missing public ratings or posters are refreshed.
-        if current.get("poster") and current.get("imdb_rating") and current.get("rt_score") and current.get("metacritic_score"):
+        if current.get("imdb_rating") and current.get("rt_score") and current.get("metacritic_score"):
             continue
         try:
             found = enrich(movie)
             if found:
-                merged = {**found,**{field:value for field,value in current.items() if value not in ("",None,[])}}
+                merged = {**found, **{field:value for field,value in current.items() if value not in ("",None,[]) and field not in ("imdb_rating","rt_score","metacritic_score","tmdb_rating")}}
                 if merged != current:
                     existing[k] = merged
                     changed += 1
