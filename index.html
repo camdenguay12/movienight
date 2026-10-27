@@ -143,6 +143,7 @@ function addToMyWatchlist(id){if(!requireOwner(activeMember))return;let f=films.
 function changeMyPin(){if(!activeMember)return;const oldPin=prompt('Current four-digit PIN');if(oldPin===null)return;const newPin=prompt('New four-digit PIN');if(!/^[0-9]{4}$/.test(newPin||'')){alert('Use exactly four digits');return}liveWrite({action:'changePin',member:activeMember,oldPin,newPin});alert('PIN change submitted. It will apply once the backend processes it.')}
 function resetMemberPin(){if(activeMember!=='Camden')return;const member=prompt('Reset PIN for which member? ('+members.join(', ')+')');if(!members.includes(member))return;liveWrite({action:'resetPin',member});alert('Reset requested. The member can choose a new PIN after the backend processes it.')}
 
+function resolveMissingTitles(){for(const f of films){if(String(f.title||'').trim())continue;const found=metadata['imdb-'+f.id];if(found?.title){f.title=found.title;f.year=found.year||f.year}}}
 let liveReady=false,liveLoading=false,liveLast='';
 function loadLive(){
  if(!LIVE_ENDPOINT||liveLoading)return;
@@ -150,7 +151,7 @@ function loadLive(){
  const callback='movieNightSync'+Date.now(),script=document.createElement('script');
  const timeout=setTimeout(()=>finish(),12000);
  function finish(){clearTimeout(timeout);delete window[callback];script.remove();liveLoading=false}
- window[callback]=data=>{if(Array.isArray(data?.films)){films=data.films;for(const [m,q] of Object.entries(data.quotes||{}))if(members.includes(m)){quotes[m]=q;localStorage.setItem('quote-'+m,q)}liveReady=true;liveLast=data.updatedAt;localStorage.setItem('movieNightFilms',JSON.stringify(films));render();schedulePosterLookup()}finish()};
+ window[callback]=data=>{if(Array.isArray(data?.films)){films=data.films;resolveMissingTitles();for(const [m,q] of Object.entries(data.quotes||{}))if(members.includes(m)){quotes[m]=q;localStorage.setItem('quote-'+m,q)}liveReady=true;liveLast=data.updatedAt;localStorage.setItem('movieNightFilms',JSON.stringify(films));render();schedulePosterLookup()}finish()};
  script.onerror=finish;
  script.src=LIVE_ENDPOINT+'?callback='+callback+'&v='+Date.now();
  document.head.appendChild(script);
@@ -232,5 +233,5 @@ async function fillMissingPosters(){
  }finally{posterLookupBusy=false;if(films.some(f=>!metadata[metaKey(f)]?.poster&&!f.poster&&!externalPosters[metaKey(f)]&&!posterAttempts.has(metaKey(f))))setTimeout(schedulePosterLookup,4000)}
 }
 setTimeout(schedulePosterLookup,2500);
-fetch('./data/movie-metadata.json?v=1',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(data=>{metadata=data;render();if(!activeMember)renderProfiles();schedulePosterLookup()}).catch(console.warn);
+fetch('./data/movie-metadata.json?v=1',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(data=>{metadata=data;resolveMissingTitles();render();if(!activeMember)renderProfiles();schedulePosterLookup()}).catch(console.warn);
 </script></body></html>
