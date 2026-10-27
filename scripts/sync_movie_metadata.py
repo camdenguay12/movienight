@@ -98,7 +98,8 @@ def enrich(movie):
 
 def main():
     if not (TMDB_KEY or TMDB_TOKEN or OMDB_KEY):
-        raise SystemExit("Set TMDB or OMDB API secrets in GitHub Actions")\n    print("API configuration: TMDB",bool(TMDB_KEY or TMDB_TOKEN),"OMDb",bool(OMDB_KEY))
+        raise SystemExit("Set TMDB or OMDB API secrets in GitHub Actions")
+    print("API configuration: TMDB",bool(TMDB_KEY or TMDB_TOKEN),"OMDb",bool(OMDB_KEY))
     state = get(LIVE)
     films = state.get("films",[])
     existing = json.loads(METADATA.read_text(encoding="utf-8"))
