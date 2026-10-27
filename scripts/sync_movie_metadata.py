@@ -45,38 +45,60 @@ def tmdb(path, params=None):
         raise RuntimeError("Missing TMDB_API_KEY or TMDB_READ_ACCESS_TOKEN secret")
     return get("https://api.themoviedb.org/3/" + path + "?" + urllib.parse.urlencode(params), headers)
 
+def omdb_ratings(title, year, imdb_id=None):
+    if not OMDB_KEY:
+        return {}
+    params = {"apikey": OMDB_KEY, "type": "movie"}
+    if imdb_id:
+        params["i"] = imdb_id
+    else:
+        params.update({"t": title, "y": year})
+    data = get("https://www.omdbapi.com/?" + urllib.parse.urlencode(params))
+    if data.get("Response") != "True":
+        print("OMDb no match:", title, year, data.get("Error", ""))
+        return {}
+    if not imdb_id and str(data.get("Year",""))[:4] != str(year):
+        print("OMDb year mismatch:", title, year, data.get("Year"))
+        return {}
+    out = {}
+    if data.get("imdbRating") not in (None, "N/A", ""):
+        out["imdb_rating"] = data["imdbRating"]
+    if data.get("Metascore") not in (None, "N/A", ""):
+        out["metacritic_score"] = data["Metascore"]
+    for rating in data.get("Ratings", []):
+        if rating.get("Source") == "Rotten Tomatoes":
+            out["rt_score"] = rating["Value"]
+    return out
+
 def enrich(movie):
     title, year = str(movie["title"]).strip(), int(movie["year"])
-    results = tmdb("search/movie", {"query":title,"include_adult":"false"}).get("results",[])
-    hits = [m for m in results if str(m.get("release_date",""))[:4].isdigit() and abs(int(str(m["release_date"])[:4])-year)<=1 and (same(m.get("title",""),title) or same(m.get("original_title",""),title))]
-    if not hits:
-        print("No exact TMDB match:",title,year)
-        return None
-    match = max(hits,key=lambda m:(int(str(m.get("release_date",""))[:4])==year,m.get("popularity",0)))
-    details = tmdb("movie/"+str(match["id"]),{"append_to_response":"credits"})
-    cast = [person.get("name") for person in details.get("credits",{}).get("cast",[])[:6] if person.get("name")]
-    info = {
-        "tmdb_id":match["id"], "poster":details.get("poster_path","").lstrip("/"),
-        "genre":", ".join(g["name"] for g in details.get("genres",[])),
-        "runtime":details.get("runtime"), "plot":details.get("overview",""),
-        "cast":cast,"tmdb_url":"https://www.themoviedb.org/movie/"+str(match["id"]),
-        "tmdb_rating":round(float(details.get("vote_average") or 0),1)
-    }
+    info = {}
+    imdb_id = str(movie.get("id") or "")
+    if not re.fullmatch(r"tt\\d{7,10}", imdb_id):
+        imdb_id = None
+    if TMDB_KEY or TMDB_TOKEN:
+        results = tmdb("search/movie", {"query":title,"include_adult":"false"}).get("results",[])
+        hits = [m for m in results if str(m.get("release_date",""))[:4].isdigit() and abs(int(str(m["release_date"])[:4])-year)<=1 and (same(m.get("title",""),title) or same(m.get("original_title",""),title))]
+        if hits:
+            match = max(hits,key=lambda m:(int(str(m.get("release_date",""))[:4])==year,m.get("popularity",0)))
+            details = tmdb("movie/"+str(match["id"]),{"append_to_response":"credits"})
+            cast = [person.get("name") for person in details.get("credits",{}).get("cast",[])[:6] if person.get("name")]
+            info = {"tmdb_id":match["id"],"poster":(details.get("poster_path") or "").lstrip("/"),"genre":", ".join(g["name"] for g in details.get("genres",[])),"runtime":details.get("runtime"),"plot":details.get("overview",""),"cast":cast,"tmdb_url":"https://www.themoviedb.org/movie/"+str(match["id"]),"tmdb_rating":round(float(details.get("vote_average") or 0),1)}
+            imdb_id = details.get("imdb_id") or imdb_id
+        else:
+            print("TMDB no match; attempting OMDb independently:",title,year)
     if OMDB_KEY:
-        params = {"apikey":OMDB_KEY,"t":title,"y":year,"type":"movie"}
-        if details.get("imdb_id"):
-            params = {"apikey":OMDB_KEY,"i":details["imdb_id"]}
-        omdb = get("https://www.omdbapi.com/?" + urllib.parse.urlencode(params))
-        if omdb.get("Response") == "True" and (not omdb.get("Year") or str(omdb["Year"])[:4]==str(year)):
-            if omdb.get("imdbRating") not in (None,"N/A"): info["imdb_rating"] = omdb["imdbRating"]
-            if omdb.get("Metascore") not in (None,"N/A"): info["metacritic_score"] = omdb["Metascore"]
-            for rating in omdb.get("Ratings",[]):
-                if rating.get("Source")=="Rotten Tomatoes":info["rt_score"]=rating["Value"]
-    return info
+        try:
+            info.update(omdb_ratings(title,year,imdb_id))
+            if not any(k in info for k in ("imdb_rating","rt_score","metacritic_score")) and imdb_id:
+                info.update(omdb_ratings(title,year))
+        except Exception as exc:
+            print("OMDb lookup failed:",title,year,str(exc))
+    return info or None
 
 def main():
-    if not (TMDB_KEY or TMDB_TOKEN):
-        raise SystemExit("Set TMDB_API_KEY or TMDB_READ_ACCESS_TOKEN in GitHub Secrets")
+    if not (TMDB_KEY or TMDB_TOKEN or OMDB_KEY):
+        raise SystemExit("Set TMDB or OMDB API secrets in GitHub Actions")\n    print("API configuration: TMDB",bool(TMDB_KEY or TMDB_TOKEN),"OMDb",bool(OMDB_KEY))
     state = get(LIVE)
     films = state.get("films",[])
     existing = json.loads(METADATA.read_text(encoding="utf-8"))
@@ -111,7 +133,7 @@ def main():
         try:
             found = enrich(movie)
             if found:
-                merged = {**found, **{field:value for field,value in current.items() if value not in ("",None,[]) and field not in ("imdb_rating","rt_score","metacritic_score","tmdb_rating")}}
+                merged = {**current, **{field:value for field,value in found.items() if value not in ("",None,[]) and (field not in current or current.get(field) in ("",None,[]) or field in ("imdb_rating","rt_score","metacritic_score","tmdb_rating"))}}
                 if merged != current:
                     existing[k] = merged
                     changed += 1
