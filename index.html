@@ -166,13 +166,25 @@ function confirmPendingWrites(){
  if(before!==pendingWrites.length){persistPending();if(!pendingWrites.length)console.info('Movie Night: all movie edits verified in Google Sheets')}
 }
 function scheduleSyncRetry(delay=2500){if(syncRetryTimer||!pendingWrites.length)return;syncRetryTimer=setTimeout(()=>{syncRetryTimer=null;flushPendingWrites()},delay)}
+function recoverLocalMovies(remoteFilms){
+ if(!activeMember)return;
+ for(const f of films){
+  if(!String(f.id).startsWith('local-')||remoteFilms.some(x=>x.id===f.id)||pendingWrites.some(p=>p.movieId===f.id))continue;
+  for(const m of members){
+   if(!Object.hasOwn(f.ratings,m)&&!f.watchlist.includes(m))continue;
+   if(m!==activeMember&&activeMember!=='Camden')continue;
+   pendingWrites.push({action:'list',movieId:f.id,member:m,status:Object.hasOwn(f.ratings,m)?'Rated':'Watchlist',rating:f.ratings[m],movie:{id:f.id,title:f.title,year:f.year,genre:f.genre,poster:f.poster,letterboxd:f.letterboxd}});
+  }
+ }
+ persistPending();
+}
 function loadLive(){
  if(!LIVE_ENDPOINT||liveLoading)return;
  liveLoading=true;
  const callback='movieNightSync'+Date.now(),script=document.createElement('script');
  const timeout=setTimeout(()=>finish(),12000);
  function finish(){clearTimeout(timeout);delete window[callback];script.remove();liveLoading=false}
- window[callback]=data=>{if(Array.isArray(data?.films)){films=data.films;resolveMissingTitles();confirmPendingWrites();mergePendingMovies();for(const [m,q] of Object.entries(data.quotes||{}))if(members.includes(m)){quotes[m]=q;localStorage.setItem('quote-'+m,q)}liveReady=true;liveLast=data.updatedAt;save();render();schedulePosterLookup();scheduleSyncRetry(1800)}finish()};
+ window[callback]=data=>{if(Array.isArray(data?.films)){recoverLocalMovies(data.films);films=data.films;resolveMissingTitles();confirmPendingWrites();mergePendingMovies();for(const [m,q] of Object.entries(data.quotes||{}))if(members.includes(m)){quotes[m]=q;localStorage.setItem('quote-'+m,q)}liveReady=true;liveLast=data.updatedAt;save();render();schedulePosterLookup();scheduleSyncRetry(1800)}finish()};
  script.onerror=finish;
  script.src=LIVE_ENDPOINT+'?callback='+callback+'&v='+Date.now();
  document.head.appendChild(script);
