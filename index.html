@@ -261,8 +261,8 @@ async function loadFeaturedPosters(){for(const [title,year,key] of [['Hokum',202
 loadFeaturedPosters();
 const posterAttempts=new Set();let posterLookupTimer=null,posterLookupBusy=false;
 function schedulePosterLookup(){if(posterLookupTimer)return;posterLookupTimer=setTimeout(()=>{posterLookupTimer=null;fillMissingPosters()},700)}
-const movieTitleAliases={'seven':'se7en','se7en':'seven','shawshank redemption':'the shawshank redemption','the shawshank redemption':'shawshank redemption'};
-const normalizeMovieTitle=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+const movieTitleAliases={'caché':'hidden','cache':'hidden','seven':'se7en','se7en':'seven','shawshank redemption':'the shawshank redemption','the shawshank redemption':'shawshank redemption'};
+const normalizeMovieTitle=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 async function fillMissingPosters(){
  if(posterLookupBusy)return;posterLookupBusy=true;
  try{
