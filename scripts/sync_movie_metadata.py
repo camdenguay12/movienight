@@ -70,7 +70,26 @@ def main():
     changed = 0
     for movie in films:
         title,year = movie.get("title"),movie.get("year")
-        if not title or not str(year).isdigit(): continue
+        if not str(title or "").strip():
+            imdb_id = str(movie.get("id") or movie.get("imdb_id") or "")
+            if re.fullmatch(r"tt\d{7,10}", imdb_id):
+                try:
+                    matches = tmdb("find/" + imdb_id, {"external_source": "imdb_id"}).get("movie_results", [])
+                    if matches:
+                        hit = matches[0]
+                        resolved = hit.get("title") or hit.get("original_title")
+                        resolved_year = str(hit.get("release_date") or "")[:4]
+                        if resolved and resolved_year.isdigit():
+                            k_missing = "imdb-" + imdb_id
+                            record = {"title": resolved, "year": int(resolved_year)}
+                            if existing.get(k_missing) != record:
+                                existing[k_missing] = record
+                                changed += 1
+                                print("Resolved missing title:", imdb_id, resolved)
+                except Exception as exc:
+                    print("Title lookup failed:", imdb_id, str(exc))
+            continue
+        if not str(year).isdigit(): continue
         k = key(title,year)
         current = existing.get(k,{})
         # Existing curated metadata stays intact; missing public ratings or posters are refreshed.
