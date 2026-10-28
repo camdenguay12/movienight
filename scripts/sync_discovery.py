@@ -34,6 +34,7 @@ for category in ("popular","top_rated","now_playing"):
             print("TMDB fetch failed",category,page,str(e));continue
         for m in data.get("results",[]):
             if not m.get("title") or not m.get("release_date") or not m.get("poster_path"):continue
+            if float(m.get("vote_average") or 0)<=5:continue
             ident=str(m["id"])
             item=items.setdefault(ident,{"id":ident,"title":m["title"],"year":int(m["release_date"][:4]),"poster":"https://image.tmdb.org/t/p/w500"+m["poster_path"],"overview":m.get("overview",""),"score":round(float(m.get("vote_average",0)),1),"votes":m.get("vote_count",0),"popularity":m.get("popularity",0),"genres":m.get("genre_ids",[]),"categories":[]})
             if category not in item["categories"]:item["categories"].append(category)
@@ -60,6 +61,21 @@ if omdb:
         except Exception as e:print("OMDb lookup failed",m["title"],str(e))
     print("OMDb lookups",enriched)
 if not items:raise SystemExit("No TMDB movies retrieved; keeping last catalog")
-out={"updatedAt":datetime.datetime.now(datetime.timezone.utc).isoformat(),"movies":list(items.values())}
+# Keep the 100 highest-ranked eligible discoveries, prioritizing popularity while
+# maintaining representation from all three discovery categories.
+eligible=sorted(items.values(),key=lambda m:(float(m.get("popularity") or 0),float(m.get("score") or 0)),reverse=True)
+selected=[]
+seen=set()
+for category in ("popular","top_rated","now_playing"):
+    for movie in (m for m in eligible if category in m["categories"]):
+        if sum(category in x["categories"] for x in selected)>=20:break
+        if movie["id"] not in seen:
+            selected.append(movie);seen.add(movie["id"])
+for movie in eligible:
+    if len(selected)>=100:break
+    if movie["id"] not in seen:
+        selected.append(movie);seen.add(movie["id"])
+selected=selected[:100]
+out={"updatedAt":datetime.datetime.now(datetime.timezone.utc).isoformat(),"movies":selected}
 path=Path("data/discovery.json");path.parent.mkdir(exist_ok=True);path.write_text(json.dumps(out,ensure_ascii=False,separators=(",",":")))
-print("Wrote",len(items),"discoverable films")
+print("Wrote",len(selected),"discoverable films rated above 5/10")
