@@ -437,7 +437,7 @@ if(isBar){
 }
 svg+='</svg>';
 const legend=groups.length>1&&isScatter||groups.length>1&&isBar?'<div class="datalegend">'+groups.map(g=>'<span><i style="background:'+color(g)+'"></i>'+esc(g)+'</span>').join('')+'</div>':'';
-el.innerHTML='<div class="datacharthead"><strong>'+esc(headline)+'</strong><span>'+rows.length+' movies included</span></div>'+zoomControls+svg+legend+'<p class="muted datafoot">'+esc(caption)+' Movies missing selected metadata are excluded.</p>';
+el.innerHTML='<div class="datacharthead"><strong>'+esc(headline)+'</strong><span>'+rows.length+' movies included</span></div>'+svg+legend+'<p class="muted datafoot">'+esc(caption)+' Movies missing selected metadata are excluded.</p>';
 }
 const heroSceneNames=['Logo on Projector Screen','Projected Title Beam','Film Strip Animation','Close-Up Projector Screen','Theater Setting','Collage Wall','Animated Film Reel','Neon / Retro Theater Sign'];
 let heroSceneIndex=4;
