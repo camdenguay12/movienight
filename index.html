@@ -259,9 +259,9 @@ function cards(arr){return '<div class="posters">'+(filtered(arr).map(poster).jo
 
 
 const dataFields=[['rating','User rating'],['runtime','Movie length (minutes)'],['rt','Rotten Tomatoes rating (%)'],['imdb','IMDb rating'],['genre','Genre'],['year','Release year']];
-const legendFields=[['none','None'],['genre','Genre'],['decade','Release decade']];
+const legendFields=[['none','None'],['genre','Genre'],['era','Pre / Post 2000']];
 let dataX='year',dataY='rating',dataLegend='none';
-function dataField(f,m,k){const d=metadata[metaKey(f)]||{};if(k==='genre')return (d.genre||f.genre||'').split(',')[0].trim()||null;if(k==='decade')return Number(f.year)?Math.floor(Number(f.year)/10)*10+'s':null;const v=k==='rating'?f.ratings[m]:k==='runtime'?d.runtime:k==='rt'?d.rt_score:k==='imdb'?d.imdb_rating:f.year;return v===undefined||v===null||v===''?null:Number.isFinite(parseFloat(v))?parseFloat(v):null}
+function dataField(f,m,k){const d=metadata[metaKey(f)]||{};if(k==='genre')return (d.genre||f.genre||'').split(',')[0].trim()||null;if(k==='era')return Number.isFinite(Number(f.year))&&Number(f.year)>0?(Number(f.year)<2000?'Pre-2000':'2000 onward'):null;const v=k==='rating'?f.ratings[m]:k==='runtime'?d.runtime:k==='rt'?d.rt_score:k==='imdb'?d.imdb_rating:f.year;return v===undefined||v===null||v===''?null:Number.isFinite(parseFloat(v))?parseFloat(v):null}
 function memberDataPage(m){const select=(id,value,opts)=>'<label>'+id+'<select onchange="'+(id==='X axis'?'dataX':id==='Y axis'?'dataY':'dataLegend')+'=this.value;renderContent()">'+opts.map(([k,t])=>'<option value="'+k+'" '+(value===k?'selected':'')+'>'+esc(t)+'</option>').join('')+'</select></label>';return '<div class="memberheading"><h2>Movie Data</h2></div><p class="muted">Explore '+esc(m==='John'?'Johny':m)+'’s rated movies. Select two variables and optionally group movies by a legend.</p><div class="datafilters">'+select('X axis',dataX,dataFields)+select('Y axis',dataY,dataFields)+select('Legend',dataLegend,legendFields)+'</div><div id="memberChart" class="memberchart"></div>'}
 function drawMemberChart(){
 if(sub!=='Data'||!members.includes(page))return;
@@ -270,21 +270,22 @@ const xcat=dataX==='genre',ycat=dataY==='genre',isBar=xcat!==ycat,isScatter=!xca
 const rows=films.filter(f=>watched(f,page)).map(f=>({f,x:dataField(f,page,dataX),y:dataField(f,page,dataY),g:dataLegend==='none'?'All movies':dataField(f,page,dataLegend)})).filter(r=>r.x!==null&&r.y!==null&&r.g!==null);
 if(!rows.length){el.innerHTML='<p class="muted">No movies have all selected data available yet. Try other variables or wait for movie metadata to update.</p>';return}
 const label=k=>dataFields.find(a=>a[0]===k)?.[1]||k,colors=['#f4c66e','#64c8ed','#f18c89','#90db9a','#bd9ff2','#f2b779','#e7a4da','#8acdc5','#c9d17b','#e8b4a0'];
-const groups=dataLegend==='none'?['All movies']:[...new Set(rows.map(r=>String(r.g)))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+if(dataLegend==='genre'){const counts=new Map();rows.forEach(r=>counts.set(String(r.g),(counts.get(String(r.g))||0)+1));const top=[...counts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,7).map(x=>x[0]);rows.forEach(r=>{if(!top.includes(String(r.g)))r.g='Other'});}
+const groups=dataLegend==='none'?['All movies']:[...new Set(rows.map(r=>String(r.g)))].sort((a,b)=>a==='Other'?1:b==='Other'?-1:a.localeCompare(b,undefined,{numeric:true}));
 const color=g=>colors[Math.max(0,groups.indexOf(String(g)))%colors.length];
 const W=900,H=480,L=100,R=30,T=32,B=100,iw=W-L-R,ih=H-T-B;
 let svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(label(dataX)+' versus '+label(dataY))+'" style="width:100%;height:auto;display:block">';
 svg+='<rect x="'+L+'" y="'+T+'" width="'+iw+'" height="'+ih+'" fill="#14232f" rx="8"/>';
 let caption='',headline='';
 if(isBar){
- const catKey=xcat?'x':'y',numKey=xcat?'y':'x',categories=[...new Set(rows.map(r=>String(r[catKey])))].sort();
+ const catKey=xcat?'x':'y',numKey=xcat?'y':'x',categories=[...new Set(rows.map(r=>String(r[catKey])))].sort((a,b)=>{const mean=c=>{const v=rows.filter(r=>String(r[catKey])===c).map(r=>Number(r[numKey]));return v.reduce((sum,x)=>sum+x,0)/v.length};return mean(b)-mean(a)||a.localeCompare(b)});
  const entries=[];
  for(const c of categories)for(const g of groups){const vals=rows.filter(r=>String(r[catKey])===c&&String(r.g)===g).map(r=>Number(r[numKey]));if(vals.length)entries.push({c,g,n:vals.length,mean:vals.reduce((a,b)=>a+b,0)/vals.length})}
  const max=Math.max(1,...entries.map(e=>e.mean)),barGroup=iw/categories.length,barWidth=Math.min(54,barGroup*.78/Math.max(1,groups.length));
  for(let i=0;i<=5;i++){const y=T+ih-i*ih/5;svg+='<line x1="'+L+'" x2="'+(L+iw)+'" y1="'+y+'" y2="'+y+'" stroke="#344b59"/><text x="'+(L-12)+'" y="'+(y+4)+'" text-anchor="end" fill="#b8c8d0" font-size="12">'+(max*i/5).toFixed(1)+'</text>'}
  entries.forEach(e=>{const ci=categories.indexOf(e.c),gi=groups.indexOf(String(e.g)),center=L+(ci+.5)*barGroup,xx=center+(gi-(groups.length-1)/2)*barWidth-barWidth*.42,hh=e.mean/max*ih,yy=T+ih-hh;svg+='<rect x="'+xx+'" y="'+yy+'" width="'+(barWidth*.84)+'" height="'+hh+'" fill="'+color(e.g)+'" rx="3"><title>'+esc(e.c+' — '+e.g+': average '+e.mean.toFixed(2)+' ('+e.n+' movies)')+'</title></rect>'});
  categories.forEach((c,i)=>{const xx=L+(i+.5)*barGroup,yy=T+ih+18;svg+='<text x="'+xx+'" y="'+yy+'" transform="rotate(-35 '+xx+' '+yy+')" text-anchor="end" fill="#cdd7dd" font-size="12">'+esc(c)+'</text>'});
- svg+='<text x="'+(L+iw/2)+'" y="'+(H-8)+'" text-anchor="middle" fill="#f4c66e" font-size="16">'+esc(xcat?label(dataX):label(dataY))+'</text><text x="20" y="'+(T+ih/2)+'" transform="rotate(-90 20 '+(T+ih/2)+')" text-anchor="middle" fill="#f4c66e" font-size="16">'+esc(label(xcat?dataY:dataX)+' (average)')+'</text>';
+ svg+='<text x="'+(L+iw/2)+'" y="'+(H-8)+'" text-anchor="middle" fill="#f4c66e" font-size="22" font-family="Righteous, sans-serif" font-weight="700">'+esc(xcat?label(dataX):label(dataY))+'</text><text x="20" y="'+(T+ih/2)+'" transform="rotate(-90 20 '+(T+ih/2)+')" text-anchor="middle" fill="#f4c66e" font-size="22" font-family="Righteous, sans-serif" font-weight="700">'+esc(label(xcat?dataY:dataX)+' (average)')+'</text>';
  headline='Average by '+(xcat?label(dataX):label(dataY));caption='Each bar represents the mean of the available movies in its category; hover for the sample size.';
 }else if(isScatter){
  const values=k=>rows.map(r=>Number(r[k])),range=k=>{let lo=Math.min(...values(k)),hi=Math.max(...values(k));if(lo===hi){lo-=1;hi+=1}const pad=(hi-lo)*.06;return [lo-pad,hi+pad]};
@@ -294,10 +295,10 @@ if(isBar){
  // One least-squares regression across every plotted movie; legend only changes point colors.
  {const pts=rows,n=pts.length;if(n>=2){const mx=pts.reduce((a,r)=>a+Number(r.x),0)/n,my=pts.reduce((a,r)=>a+Number(r.y),0)/n,den=pts.reduce((a,r)=>a+(Number(r.x)-mx)**2,0);if(den>0){const slope=pts.reduce((a,r)=>a+(Number(r.x)-mx)*(Number(r.y)-my),0)/den,intercept=my-slope*mx;const lo=Math.max(xmin,Math.min(...pts.map(r=>Number(r.x)))),hi=Math.min(xmax,Math.max(...pts.map(r=>Number(r.x))));svg+='<line x1="'+X(lo)+'" y1="'+Y(intercept+slope*lo)+'" x2="'+X(hi)+'" y2="'+Y(intercept+slope*hi)+'" stroke="#ffffff" stroke-width="3" stroke-dasharray="9 6" opacity=".95"><title>Overall linear trendline ('+n+' movies)</title></line>'}}}
  rows.forEach(r=>svg+='<circle cx="'+X(r.x)+'" cy="'+Y(r.y)+'" r="6" fill="'+color(r.g)+'" fill-opacity=".85" stroke="#0d1b23" stroke-width="1" onclick="openDetail('+JSON.stringify(String(r.f.id)).replace(/"/g,'&quot;')+')" style="cursor:pointer"><title>'+esc(r.f.title+' ('+r.f.year+') — '+label(dataX)+': '+r.x+', '+label(dataY)+': '+r.y)+'</title></circle>');
- svg+='<text x="'+(L+iw/2)+'" y="'+(H-8)+'" text-anchor="middle" fill="#f4c66e" font-size="16">'+esc(label(dataX))+'</text><text x="20" y="'+(T+ih/2)+'" transform="rotate(-90 20 '+(T+ih/2)+')" text-anchor="middle" fill="#f4c66e" font-size="16">'+esc(label(dataY))+'</text>';
+ svg+='<text x="'+(L+iw/2)+'" y="'+(H-8)+'" text-anchor="middle" fill="#f4c66e" font-size="22" font-family="Righteous, sans-serif" font-weight="700">'+esc(label(dataX))+'</text><text x="20" y="'+(T+ih/2)+'" transform="rotate(-90 20 '+(T+ih/2)+')" text-anchor="middle" fill="#f4c66e" font-size="22" font-family="Righteous, sans-serif" font-weight="700">'+esc(label(dataY))+'</text>';
  headline='Movie scatterplot';caption='The dashed line shows the overall least-squares trend across all movies. Legend groups change point colors only. Hover over a point for its movie; click for details.';
 }else{
- const cats=[...new Set(rows.map(r=>String(r.x)))].sort();const counts=cats.map(c=>rows.filter(r=>String(r.x)===c).length),max=Math.max(...counts,1),bw=iw/cats.length;
+ const cats=[...new Set(rows.map(r=>String(r.x)))].sort((a,b)=>rows.filter(r=>String(r.x)===b).length-rows.filter(r=>String(r.x)===a).length||a.localeCompare(b));const counts=cats.map(c=>rows.filter(r=>String(r.x)===c).length),max=Math.max(...counts,1),bw=iw/cats.length;
  for(let i=0;i<=5;i++){let y=T+ih-i*ih/5;svg+='<line x1="'+L+'" x2="'+(L+iw)+'" y1="'+y+'" y2="'+y+'" stroke="#344b59"/><text x="'+(L-12)+'" y="'+(y+4)+'" text-anchor="end" fill="#b8c8d0" font-size="12">'+Math.round(max*i/5)+'</text>'}
  cats.forEach((c,i)=>{let h=counts[i]/max*ih,x=L+(i+.15)*bw,y=T+ih-h;svg+='<rect x="'+x+'" y="'+y+'" width="'+(bw*.7)+'" height="'+h+'" fill="#f4c66e" rx="3"><title>'+esc(c+': '+counts[i]+' movies')+'</title></rect><text x="'+(L+(i+.5)*bw)+'" y="'+(T+ih+20)+'" fill="#cdd7dd" text-anchor="end" font-size="12" transform="rotate(-35 '+(L+(i+.5)*bw)+' '+(T+ih+20)+')">'+esc(c)+'</text>'});
  headline='Movies by genre';caption='Both axes are categorical, so the chart shows movie counts.';
