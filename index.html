@@ -140,6 +140,27 @@ dialog{border:3px solid #b69aff;box-shadow:0 0 0 1px #e0d0ff66,0 20px 70px #000b
 }
 
 .datafilters{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0}.datafilters label{display:flex;flex-direction:column;gap:7px;flex:1 1 180px;color:#d9e5e9;font-weight:700}.datafilters select{width:100%;background:#172631;color:#f7e8c8;border:1px solid #526b80;border-radius:9px;padding:11px}.memberchart{background:#1a2b37;border:1px solid #405969;border-radius:14px;padding:16px;margin:16px 0 30px;overflow:hidden}.datacharthead{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:#f4c66e;margin:0 0 12px}.datacharthead span{color:#b8c8d0}.datalegend{display:flex;flex-wrap:wrap;gap:10px 16px;margin:8px 0}.datalegend span{font-size:12px;display:flex;align-items:center;gap:5px}.datalegend i{width:10px;height:10px;border-radius:50%;display:inline-block}.datafoot{font-size:12px;margin:12px 0 0}.datapoint:hover{stroke:#fff;stroke-width:2;r:8}@media(max-width:600px){.memberchart{padding:8px}.datafilters{gap:8px}.datafilters label{flex-basis:135px;font-size:12px}}
+
+/* Consistent Righteous display type for navigation, member profiles, controls and chart titles.
+   Inherit existing colors so only typography changes. */
+.nav button,.subnav button,
+.profilehero .profilecopy h1,
+.memberheading h2,
+.wrap > h1,.wrap > .eyebrow + h1,
+.hero h1:not(.homeidentity h1),
+.filterbar label,.filterbar select,.filterbar option,
+.discoveryfilters select,.discoveryfilters option,
+.datafilters label,.datafilters select,.datafilters option,
+.viewtoggle button,.datacharthead strong,
+.userpicker label,.userpicker span,
+.memberinline,
+#content h2,#content h3,
+#discoveryControls label,#discoveryControls select,
+#discoveryControls option {
+ font-family:'Righteous',Impact,system-ui,sans-serif;
+ font-weight:400;
+ letter-spacing:.015em;
+}
 </style></head><body><header class="top"><div class="brand"><img src="assets/ram-popcorn-logo.png.png" alt="Ram with sunglasses and popcorn" onerror="this.style.display='none'"><span>RamFlix</span></div><nav class="nav" id="nav"></nav></header><main class="wrap" id="app"></main>
 <dialog id="detailDialog"><div class="dialogtop"><h2 id="detailTitle"></h2><button class="close" onclick="detailDialog.close()">×</button></div><div id="detailBody"></div></dialog>
 <dialog id="signatureDialog"><div class="dialogtop"><h2>Your signature movie</h2><button class="close" onclick="signatureDialog.close()">×</button></div><div id="signatureBody"></div></dialog><dialog id="addDialog"><div class="dialogtop"><h2>Add a movie</h2><button class="close" onclick="addDialog.close()">×</button></div><form id="movieForm"><div class="formgrid"><label>Movie title<input name="title" required placeholder="e.g. The Grand Budapest Hotel"></label><label>Release year<input name="year" type="number" min="1880" max="2100" placeholder="2014"></label><label>Member<select name="member" id="formMember"></select></label><fieldset class="listchoice"><legend>Add to</legend><input type="hidden" name="status" id="formStatus" value="watchlist"><div class="listchoicebuttons"><button type="button" class="active" data-list="watchlist" onclick="chooseAddList('watchlist')">Watchlist</button><button type="button" data-list="watched" onclick="chooseAddList('watched')">Rated</button></div></fieldset><label id="addRatingField" style="display:none">My rating (0–10; optional)<input name="rating" type="number" min="0" max="10" step=".1" placeholder="8.5"></label></div><p class="muted">New titles are saved in this browser for now. Shared accounts and automatic movie matching will be added when we connect a database.</p><button class="primary">Save movie</button></form></dialog>
