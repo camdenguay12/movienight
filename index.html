@@ -271,6 +271,37 @@ dialog{border:3px solid #b69aff;box-shadow:0 0 0 1px #e0d0ff66,0 20px 70px #000b
 @media(max-width:600px){.ramflix-carousel .scene-projector{left:0;width:23%;top:27%;height:40%}.ramflix-carousel .scene-projector::before{border-width:7px}.ramflix-carousel.hero-scene-5 .theater-screen{width:86%}.ramflix-carousel.hero-scene-5 .theater-seats{height:75px;background-size:62px 65px}.ramflix-carousel.hero-scene-1 .theater-screen,.ramflix-carousel.hero-scene-2 .theater-screen{margin-left:12%;width:78%}.ramflix-carousel.hero-scene-3 .theater-screen,.ramflix-carousel.hero-scene-7 .theater-screen{margin-left:12%;width:77%}}
 @media(prefers-reduced-motion:reduce){.ramflix-carousel.hero-scene-2 .theater-stage::after{animation:none}}
 
+
+/* Theater scene: sculpted, upholstered seat backs with visible seams and depth. */
+.ramflix-carousel.hero-scene-5 .theater-seats{
+ left:-5%;width:110%;bottom:-19px;height:138px;opacity:1!important;
+ background:
+ radial-gradient(ellipse 33px 12px at 50% 18%,#a4444a 0%,#70242b 52%,transparent 78%) 0 4px/96px 108px repeat-x,
+ radial-gradient(ellipse 39px 67px at 50% 92%,#10090c 0 39%,#351017 55%,#691e29 68%,#27080d 82%,transparent 86%) 0 4px/96px 108px repeat-x,
+ linear-gradient(180deg,transparent 0 14%,#080609 96%);
+ filter:drop-shadow(0 -4px 5px #000a) drop-shadow(0 9px 8px #000);
+}
+.ramflix-carousel.hero-scene-5 .theater-seats::before{
+ content:"";position:absolute;inset:32px 0 0;
+ background:
+ radial-gradient(ellipse 25px 48px at 50% 73%,#240c11 12%,#42121c 52%,#17080c 82%,transparent 85%) 0 0/96px 108px repeat-x,
+ linear-gradient(90deg,transparent 0 4%,#9c4c49 7%,#2a0c13 11%,transparent 14% 86%,#27090f 89%,#9b4b49 93%,transparent 96%) 0 0/96px 108px repeat-x;
+ opacity:.96;
+}
+.ramflix-carousel.hero-scene-5 .theater-seats::after{
+ content:"";position:absolute;inset:0;
+ background:repeating-linear-gradient(90deg,transparent 0 45px,#d1827455 46px,#23080c 48px,transparent 50px,transparent 96px);
+ opacity:.42;mask-image:linear-gradient(180deg,transparent,#000 35%,#000 80%,transparent);
+}
+.ramflix-carousel.hero-scene-5 .theater-screen .homeidentity img{width:clamp(100px,15vw,185px)!important;height:clamp(100px,15vw,185px)!important}
+.ramflix-carousel.hero-scene-5 .theater-screen .homeidentity h1{font-size:clamp(55px,9vw,108px)!important;line-height:1.06}
+@media(max-width:600px){
+ .ramflix-carousel.hero-scene-5 .theater-seats{height:82px;bottom:-14px;background-size:58px 72px,58px 72px,auto}
+ .ramflix-carousel.hero-scene-5 .theater-seats::before{inset:18px 0 0;background-size:58px 72px,58px 72px}
+ .ramflix-carousel.hero-scene-5 .theater-seats::after{background-size:58px 72px}
+ .ramflix-carousel.hero-scene-5 .theater-screen .homeidentity img{width:clamp(72px,21vw,110px)!important;height:clamp(72px,21vw,110px)!important}
+ .ramflix-carousel.hero-scene-5 .theater-screen .homeidentity h1{font-size:clamp(38px,10vw,66px)!important}
+}
 </style></head><body><header class="top"><div class="brand"><img src="assets/ram-popcorn-logo.png.png" alt="Ram with sunglasses and popcorn" onerror="this.style.display='none'"><span>RamFlix</span></div><nav class="nav" id="nav"></nav></header><main class="wrap" id="app"></main>
 <dialog id="detailDialog"><div class="dialogtop"><h2 id="detailTitle"></h2><button class="close" onclick="detailDialog.close()">×</button></div><div id="detailBody"></div></dialog>
 <dialog id="signatureDialog"><div class="dialogtop"><h2>Your signature movie</h2><button class="close" onclick="signatureDialog.close()">×</button></div><div id="signatureBody"></div></dialog><dialog id="addDialog"><div class="dialogtop"><h2>Add a movie</h2><button class="close" onclick="addDialog.close()">×</button></div><form id="movieForm"><div class="formgrid"><label>Movie title<input name="title" required placeholder="e.g. The Grand Budapest Hotel"></label><label>Release year<input name="year" type="number" min="1880" max="2100" placeholder="2014"></label><label>Member<select name="member" id="formMember"></select></label><fieldset class="listchoice"><legend>Add to</legend><input type="hidden" name="status" id="formStatus" value="watchlist"><div class="listchoicebuttons"><button type="button" class="active" data-list="watchlist" onclick="chooseAddList('watchlist')">Watchlist</button><button type="button" data-list="watched" onclick="chooseAddList('watched')">Rated</button></div></fieldset><label id="addRatingField" style="display:none">My rating (0–10; optional)<input name="rating" type="number" min="0" max="10" step=".1" placeholder="8.5"></label></div><p class="muted">New titles are saved in this browser for now. Shared accounts and automatic movie matching will be added when we connect a database.</p><button class="primary">Save movie</button></form></dialog>
