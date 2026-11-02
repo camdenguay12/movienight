@@ -272,6 +272,18 @@ dialog{border:3px solid #b69aff;box-shadow:0 0 0 1px #e0d0ff66,0 20px 70px #000b
 @media(prefers-reduced-motion:reduce){.ramflix-carousel.hero-scene-2 .theater-stage::after{animation:none}}
 
 
+
+/* RamFlix title floats directly in the cinema, without a screen card. */
+.ramflix-carousel.hero-scene-5 .theater-screen{background:transparent!important;border:0!important;box-shadow:none!important;outline:0!important;backdrop-filter:none!important;min-height:clamp(180px,22vw,320px)}
+.ramflix-carousel.hero-scene-5 .theater-screen::before,.ramflix-carousel.hero-scene-5 .theater-screen::after{display:none!important}
+.ramflix-carousel.hero-scene-5 .theater-screen .homeidentity{filter:drop-shadow(0 5px 15px #000b)}
+.ramflix-carousel.hero-scene-5 .theater-screen .homeidentity h1{text-shadow:0 4px 18px #000a}
+.ramflix-carousel.hero-scene-5 .theater-curtain{z-index:1}
+.ramflix-carousel.hero-scene-5 .theater-screen{z-index:2}
+.wrap>h1,.wrap>div>h1,.wrap .pageheading,.wrap>.eyebrow,.wrap>p:first-of-type{text-align:center}
+.sectionhead>h2,.memberheading>h2{text-align:center}
+.sectionhead:has(>h2){position:relative}
+@media(min-width:701px){.sectionhead:has(>h2)>h2{flex:1;text-align:center}}
 </style></head><body><header class="top"><div class="brand"><img src="assets/ram-popcorn-logo.png.png" alt="Ram with sunglasses and popcorn" onerror="this.style.display='none'"><span>RamFlix</span></div><nav class="nav" id="nav"></nav></header><main class="wrap" id="app"></main>
 <dialog id="detailDialog"><div class="dialogtop"><h2 id="detailTitle"></h2><button class="close" onclick="detailDialog.close()">×</button></div><div id="detailBody"></div></dialog>
 <dialog id="signatureDialog"><div class="dialogtop"><h2>Your signature movie</h2><button class="close" onclick="signatureDialog.close()">×</button></div><div id="signatureBody"></div></dialog><dialog id="addDialog"><div class="dialogtop"><h2>Add a movie</h2><button class="close" onclick="addDialog.close()">×</button></div><form id="movieForm"><div class="formgrid"><label>Movie title<input name="title" required placeholder="e.g. The Grand Budapest Hotel"></label><label>Release year<input name="year" type="number" min="1880" max="2100" placeholder="2014"></label><label>Member<select name="member" id="formMember"></select></label><fieldset class="listchoice"><legend>Add to</legend><input type="hidden" name="status" id="formStatus" value="watchlist"><div class="listchoicebuttons"><button type="button" class="active" data-list="watchlist" onclick="chooseAddList('watchlist')">Watchlist</button><button type="button" data-list="watched" onclick="chooseAddList('watched')">Rated</button></div></fieldset><label id="addRatingField" style="display:none">My rating (0–10; optional)<input name="rating" type="number" min="0" max="10" step=".1" placeholder="8.5"></label></div><p class="muted">New titles are saved in this browser for now. Shared accounts and automatic movie matching will be added when we connect a database.</p><button class="primary">Save movie</button></form></dialog>
@@ -379,7 +391,7 @@ async function liveWrite(payload){
  try{await fetch(LIVE_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,token:authToken})});setTimeout(loadLive,1200)}catch(e){console.warn('RamFlix update failed',e)}
 }
 const save=()=>localStorage.setItem('movieNightFilms',JSON.stringify(films));
-function saveListChange(f,m){save();liveWrite({action:'list',movieId:f.id,member:m,status:Object.hasOwn(f.ratings,m)?'Rated':f.watchlist.includes(m)?'Watchlist':'none',rating:f.ratings[m],movie:{id:f.id,title:f.title,year:f.year,genre:f.genre,poster:f.poster,letterboxd:f.letterboxd}})}
+function saveListChange(f,m){save();schedulePosterLookup();liveWrite({action:'list',movieId:f.id,member:m,status:Object.hasOwn(f.ratings,m)?'Rated':f.watchlist.includes(m)?'Watchlist':'none',rating:f.ratings[m],movie:{id:f.id,title:f.title,year:f.year,genre:f.genre,poster:f.poster,letterboxd:f.letterboxd}})}
 function storeCamdenOverride(f){let edits=JSON.parse(localStorage.getItem('camdenEdits')||'{}');edits[metaKey(f)]={rating:Object.hasOwn(f.ratings,'Camden')?f.ratings.Camden:null,watchlist:f.watchlist.includes('Camden')};localStorage.setItem('camdenEdits',JSON.stringify(edits))}function editQuote(m){if(!requireOwner(m,{type:'quote',member:m}))return;let q=prompt('Enter a favorite movie quote for '+m,localStorage.getItem('quote-'+m)||quotes[m]);if(q!==null){localStorage.setItem('quote-'+m,q.slice(0,180));quotes[m]=q.slice(0,180);if(liveReady)liveWrite({action:'quote',member:m,quote:quotes[m]});render()}}function chooseSignatureMovie(m){if(!requireOwner(m,{type:'signature',member:m}))return;const options=films.filter(f=>watched(f,m)||f.watchlist.includes(m)).sort((a,b)=>a.title.localeCompare(b.title));if(!options.length){alert('Add a movie to your rated list or watchlist first.');return}const current=signatureMovies[m]||'';const html='<form method="dialog" class="signatureform"><label for="signatureChoice">Choose a movie from your lists</label><select id="signatureChoice">'+options.map(f=>'<option value="'+esc(f.id)+'" '+(f.id===current?'selected':'')+'>'+esc(f.title)+' ('+esc(f.year)+')</option>').join('')+'</select><div class="signatureactions"><button type="button" class="secondary" onclick="signatureDialog.close()">Cancel</button><button type="button" class="primary" onclick="saveSignatureMovie(\''+m+'\')">Save signature movie</button></div></form>';document.getElementById('signatureBody').innerHTML=html;signatureDialog.showModal()}function saveSignatureMovie(m){if(!requireOwner(m,{type:'signature',member:m}))return;const id=document.getElementById('signatureChoice')?.value,f=films.find(f=>f.id===id);if(!f||!(watched(f,m)||f.watchlist.includes(m)))return;signatureMovies[m]=id;localStorage.setItem('ramflixSignatures',JSON.stringify(signatureMovies));liveWrite({action:'signature',member:m,movieId:id});signatureDialog.close();render()}function exportBrowserData(){const payload={exportedAt:new Date().toISOString(),films,quotes:Object.fromEntries(members.map(m=>[m,localStorage.getItem('quote-'+m)||quotes[m]]))};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='ramsgate-browser-data.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}function saveView(){sessionStorage.setItem('movieNightView',JSON.stringify({page,sub,ratedView}))}
 function restoreView(){try{const v=JSON.parse(sessionStorage.getItem('movieNightView')||'null');if(v&&(['Home','Movie Night','Discover',...members].includes(v.page))){page=v.page;sub=['Rated','Watchlist','Data'].includes(v.sub)?v.sub:'Rated';ratedView=['list','cards'].includes(v.ratedView)?v.ratedView:'list';return true}}catch(e){}return false}
 function setPage(p){page=p;sub='Rated';ratedView='list';search='';sortBy='default';genreFilter='all';yearFilter='all';minScore='all';maxRuntime='all';saveView();render();window.scrollTo(0,0)}function chooseAddList(status){document.getElementById('formStatus').value=status;document.querySelectorAll('.listchoicebuttons button').forEach(b=>{b.classList.toggle('active',b.dataset.list===status);b.setAttribute('aria-pressed',String(b.dataset.list===status))});toggleAddRating()}
@@ -503,7 +515,7 @@ const normalizeMovieTitle=t=>String(t||'').toLowerCase().normalize('NFD').replac
 async function fillMissingPosters(){
  if(posterLookupBusy)return;posterLookupBusy=true;
  try{
-  const missing=films.filter(f=>(!pic(f)||!(metadata[metaKey(f)]?.plot||externalDescriptions[metaKey(f)]))&&!posterAttempts.has(metaKey(f))&&f.title).slice(0,60);
+  const missing=films.filter(f=>(!pic(f)||!(metadata[metaKey(f)]?.plot||externalDescriptions[metaKey(f)]))&&!posterAttempts.has(metaKey(f))&&f.title).slice(0,120);
   for(const f of missing){
    const key=metaKey(f);posterAttempts.add(key);
    try{
@@ -516,9 +528,9 @@ async function fillMissingPosters(){
     const match=matches.sort((x,y)=>Math.abs(new Date(x.releaseDate).getUTCFullYear()-Number(f.year))-Math.abs(new Date(y.releaseDate).getUTCFullYear()-Number(f.year)))[0];
     if(match){
      const record=metadata[key]||{};
-     if(match.artworkUrl100&&!record.poster){const url=match.artworkUrl100.replace(/100x100bb/g,'600x900bb');externalPosters[key]=url;f.poster=url;if(liveReady)liveWrite({action:'poster',movieId:f.id,posterUrl:url})}
+     if(match.artworkUrl100&&!pic(f)){const url=match.artworkUrl100.replace(/100x100bb/g,'600x900bb');externalPosters[key]=url;f.poster=url;if(liveReady)liveWrite({action:'poster',movieId:f.id,posterUrl:url})}
      metadata[key]={...record,genre:record.genre||match.primaryGenreName||'',runtime:record.runtime||Math.round((match.trackTimeMillis||0)/60000)||null,plot:record.plot||match.longDescription||match.shortDescription||''};
-     save();render();
+     if(metadata[key].plot)externalDescriptions[key]=metadata[key].plot;save();render();
     }
    }catch(e){posterAttempts.delete(key);console.warn('Movie lookup failed for',f.title,e)}
   }
